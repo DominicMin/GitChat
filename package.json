@@ -1,0 +1,28 @@
+{
+  "name": "gitchat",
+  "version": "1.0.0",
+  "description": "Non-linear LLM chat interface with branching conversations",
+  "private": true,
+  "scripts": {
+    "start": "concurrently \"npm run start:server\" \"npm run start:client\"",
+    "start:server": "cd server && npm start",
+    "start:client": "cd nodechat && npm start",
+    "dev": "concurrently \"npm run dev:server\" \"npm run start:client\"",
+    "dev:server": "cd server && npm run dev",
+    "install:all": "npm install && cd server && npm install && cd ../nodechat && npm install",
+    "build": "cd nodechat && npm run build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "llm",
+    "chat",
+    "branching",
+    "openai",
+    "react"
+  ],
+  "author": "",
+  "license": "ISC"
+}
+

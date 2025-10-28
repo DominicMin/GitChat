@@ -58,37 +58,164 @@ https://github.com/user-attachments/assets/f4d123f3-4b2d-4c8d-94b2-034a1acaa00d
 - Node.js (version 14 or later)
 - npm (usually comes with Node.js)
 
-### Installation
+### Quick Start (Recommended)
 
 1. Clone the repository:
-   ```
+   ```bash
    git clone https://github.com/DrustZ/GitChat
-   ```
-
-2. Navigate to the project directory:
-   ```
    cd GitChat
    ```
 
-3. For the webapp, install dependencies:
+2. Install all dependencies:
+   ```bash
+   npm run install:all
    ```
+
+3. Configure the API (copy and edit `.env` file):
+   ```bash
+   cd server
+   cp .env.example .env
+   # Edit .env and add your API key
+   ```
+
+4. Start everything with one command:
+   
+   **On Windows:**
+   ```bash
+   start.bat
+   ```
+   
+   **On Linux/Mac:**
+   ```bash
+   ./start.sh
+   ```
+   
+   **Or use npm:**
+   ```bash
+   npm start
+   ```
+
+5. Open your browser and visit `http://localhost:3000`
+
+### Manual Installation
+
+If you prefer to start services separately:
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/DrustZ/GitChat
+   cd GitChat
+   ```
+
+2. Install frontend dependencies:
+   ```bash
    cd nodechat
    npm install
    ```
 
-4. Start the webapp:
-   ```
-   npm start
-   ```
-
-5. Do it again for the server (remember to create a .env for your openai key `OPENAI_API_KEY = `):
-   ```
-   cd server
+3. Install server dependencies:
+   ```bash
+   cd ../server
    npm install
+   ```
+
+4. Configure the API (see [Configuration](#configuration) section below):
+   ```bash
+   cp .env.example .env
+   # Edit .env and add your API key
+   ```
+
+5. Start the server (in one terminal):
+   ```bash
+   cd server
    npm start
    ```
 
-5. Open your browser and visit `http://localhost:3000` to see the application.
+6. Start the frontend (in another terminal):
+   ```bash
+   cd nodechat
+   npm start
+   ```
+
+7. Open your browser and visit `http://localhost:3000`
+
+## Configuration
+
+### Basic Setup (OpenAI)
+
+1. Copy the example environment file:
+   ```bash
+   cd server
+   cp .env.example .env
+   ```
+
+2. Edit `.env` and add your OpenAI API key:
+   ```env
+   OPENAI_API_KEY=sk-your-openai-key-here
+   OPENAI_BASE_URL=https://api.openai.com/v1
+   OPENAI_MODEL=gpt-4o
+   ```
+
+### Using OpenAI-Compatible APIs
+
+GitChat supports any OpenAI-compatible API endpoint. Simply configure the three environment variables:
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `OPENAI_API_KEY` | ✅ Yes | - | Your API key for the LLM service |
+| `OPENAI_BASE_URL` | ⚪ Optional | `https://api.openai.com/v1` | Custom API endpoint URL |
+| `OPENAI_MODEL` | ⚪ Optional | `gpt-4o` | Model name to use |
+
+#### Configuration Examples
+
+<details>
+<summary><b>Azure OpenAI</b></summary>
+
+```env
+OPENAI_BASE_URL=https://your-resource.openai.azure.com/openai/deployments/your-deployment
+OPENAI_API_KEY=your_azure_api_key
+OPENAI_MODEL=gpt-4
+```
+</details>
+
+<details>
+<summary><b>OpenRouter (Claude, Llama, etc.)</b></summary>
+
+```env
+OPENAI_BASE_URL=https://openrouter.ai/api/v1
+OPENAI_API_KEY=sk-or-v1-your-key
+OPENAI_MODEL=anthropic/claude-3-opus
+```
+
+Other models: `meta-llama/llama-3-70b`, `google/gemini-pro`, etc.
+</details>
+
+<details>
+<summary><b>Local LLM with Ollama</b></summary>
+
+```env
+OPENAI_BASE_URL=http://localhost:11434/v1
+OPENAI_API_KEY=ollama
+OPENAI_MODEL=llama2
+```
+
+First, start Ollama with OpenAI compatibility:
+```bash
+ollama serve
+```
+</details>
+
+<details>
+<summary><b>Local LLM with LM Studio</b></summary>
+
+```env
+OPENAI_BASE_URL=http://localhost:1234/v1
+OPENAI_API_KEY=lm-studio
+OPENAI_MODEL=local-model-name
+```
+
+Enable "Start Server" in LM Studio with OpenAI compatibility enabled.
+</details>
 
 ## Usage
 
