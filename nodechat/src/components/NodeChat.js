@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState, useEffect } from 'react';
 import {
   ReactFlow,
   MiniMap,
@@ -16,7 +16,12 @@ import 'react-contexify/dist/ReactContexify.css';
 import UserInputNode from './UserInputNode';
 import LLMResponseNode from './LLMResponseNode';
 import CustomEdge from './CustomEdge';
-import { sendConversationRequest, getConversationHistory } from './Utility';
+import { 
+  sendConversationRequest, 
+  getConversationHistory,
+  exportConversationToFile,
+  importConversationFromFile
+} from './Utility';
 
 const nodeTypes = {
   userInput: UserInputNode,
@@ -42,6 +47,8 @@ function NodeChat() {
     id: MENU_ID,
   });
   const currentLlmNodeId = useRef(null);
+  const fileInputRef = useRef(null);
+  const [notification, setNotification] = useState('');
 
   const onEdgeClick = useCallback((edgeId) => {
     setEdges((eds) => eds.filter((e) => e.id !== edgeId));
@@ -230,6 +237,42 @@ function NodeChat() {
     }
   }, [message, getSelectedNode, addNode, setSelectNode, reactFlow, nodes, onChunkReceived]);
 
+  // Show notification message
+  const showNotification = useCallback((msg) => {
+    setNotification(msg);
+    setTimeout(() => setNotification(''), 3000);
+  }, []);
+
+  // Handle export to file
+  const handleExport = useCallback(async () => {
+    const result = await exportConversationToFile(nodes, edges);
+    showNotification(result.message);
+  }, [nodes, edges, showNotification]);
+
+  // Handle import from file
+  const handleImport = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  // Handle file selection
+  const handleFileSelect = useCallback(async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (nodes.length > 0 && !window.confirm('当前对话将被覆盖，确定要导入吗？')) {
+      e.target.value = '';
+      return;
+    }
+
+    const result = await importConversationFromFile(file);
+    if (result.success) {
+      setNodes(result.data.nodes);
+      setEdges(result.data.edges);
+    }
+    showNotification(result.message);
+    e.target.value = '';
+  }, [nodes.length, setNodes, setEdges, showNotification]);
+
   return (
     <div className="h-full relative" ref={reactFlowWrapper}>
       <ReactFlow
@@ -272,11 +315,38 @@ function NodeChat() {
         >
           Add LLM Response
         </button>
+        <div className="border-l border-gray-300 mx-2"></div>
+        <button 
+          className="bg-indigo-500 text-white px-4 py-2 rounded hover:bg-indigo-600"
+          onClick={handleExport}
+          title="导出为文件"
+        >
+          📥 导出
+        </button>
+        <button 
+          className="bg-indigo-500 text-white px-4 py-2 rounded hover:bg-indigo-600"
+          onClick={handleImport}
+          title="从文件导入"
+        >
+          📤 导入
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json"
+          onChange={handleFileSelect}
+          style={{ display: 'none' }}
+        />
       </div>
       <Menu id={MENU_ID}>
         <Item onClick={handleReplicate}>Replicate Node</Item>
         <Item onClick={handleCreateConnectedNode}>Create Connected Node</Item>
       </Menu>
+      {notification && (
+        <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-50 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg">
+          {notification}
+        </div>
+      )}
       <div className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 z-50">
         <div className="flex items-center">
           <textarea
