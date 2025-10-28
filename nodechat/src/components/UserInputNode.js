@@ -44,14 +44,6 @@ const UserInputNode = (props) => {
     const edges = reactFlow.getEdges();
     const history = getConversationHistory(node, nodes, edges);
     
-    // Debug: 打印对话树结构
-    console.log('📊 [Regenerate] 对话树统计:');
-    console.log(`  节点数量: ${history.length}`);
-    console.log(`  总字符数: ${JSON.stringify(history).length}`);
-    history.forEach((h, i) => {
-      console.log(`  ${i + 1}. [${h.role}] ${h.content ? h.content.substring(0, 50) : '(空)'}... (${h.content?.length || 0} 字符)`);
-    });
-    
     // Get the parent user node to find the original message
     const incomers = getIncomers(node, nodes, edges);
     const parentUserNode = incomers.find(n => n.type === 'userInput');

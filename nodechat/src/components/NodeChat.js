@@ -237,14 +237,6 @@ function NodeChat() {
 
     let history = getConversationHistory(userNode, updatedNodes, updatedEdges);
     
-    // Debug: 打印对话树结构
-    console.log('📊 对话树统计:');
-    console.log(`  节点数量: ${history.length}`);
-    console.log(`  总字符数: ${JSON.stringify(history).length}`);
-    history.forEach((h, i) => {
-      console.log(`  ${i + 1}. [${h.role}] ${h.content ? h.content.substring(0, 50) : '(空)'}... (${h.content?.length || 0} 字符)`);
-    });
-    
     // Callback to save token info to userNode
     const onTokenInfo = (tokenData) => {
       setNodes((nds) =>

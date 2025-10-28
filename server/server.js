@@ -167,8 +167,14 @@ app.post("/generate", async (req, res) => {
     // Analyze conversation
     const analysis = analyzeConversation(conversation);
     
-    // Calculate input tokens
-    const conversationText = JSON.stringify(data);
+    // Filter out empty nodes
+    const cleanedConversation = conversation.filter(node => 
+      node.content && node.content.trim().length > 0
+    );
+    const cleanedData = { ...data, conversation: cleanedConversation };
+    
+    // Calculate input tokens based on cleaned data
+    const conversationText = JSON.stringify(cleanedData);
     const systemPromptTokens = countTokens(systemPrompt, MODEL_NAME);
     const conversationTokens = countTokens(conversationText, MODEL_NAME);
     const totalInputTokens = systemPromptTokens + conversationTokens;
@@ -182,12 +188,15 @@ app.post("/generate", async (req, res) => {
     console.log(`📝 Input Tokens: ~${totalInputTokens} (system: ${systemPromptTokens}, conversation: ${conversationTokens})`);
     console.log(`⏳ Waiting for response...`);
     console.log('='.repeat(60));
+    
+    // Debug: show what we're sending
+    console.log(`📤 Original nodes: ${conversation.length}, After filtering: ${cleanedConversation.length}`);
 
     const stream = await openai.chat.completions.create({
       model: MODEL_NAME,
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: JSON.stringify(data) }
+        { role: "user", content: JSON.stringify(cleanedData) }
       ],
       stream: true,
     });
@@ -304,7 +313,30 @@ app.post("/generate/gemini", async (req, res) => {
     console.log('='.repeat(60));
 
     // Build Gemini history from conversation
-    const history = buildGeminiHistory(conversation);
+    // Filter out empty nodes first
+    const nonEmptyConversation = conversation.filter(node => 
+      node.content && node.content.trim().length > 0
+    );
+    
+    // Remove the last user message if it matches newMessage (to avoid duplication)
+    let conversationHistory = nonEmptyConversation;
+    const lastNode = nonEmptyConversation[nonEmptyConversation.length - 1];
+    if (lastNode && lastNode.role === 'user' && lastNode.content === data.newMessage) {
+      console.log('⚠️  检测到重复消息，排除最后一个 user 节点');
+      conversationHistory = nonEmptyConversation.slice(0, -1);
+    }
+    
+    const history = buildGeminiHistory(conversationHistory);
+    
+    // Debug: print what we're sending
+    console.log(`📤 Original conversation nodes: ${conversation.length}`);
+    console.log(`📤 After filtering empty: ${nonEmptyConversation.length}`);
+    console.log(`📤 After removing duplicate: ${conversationHistory.length}`);
+    console.log(`📤 New message: "${data.newMessage}"`);
+    console.log('📤 Sending history:');
+    history.forEach((h, i) => {
+      console.log(`   ${i + 1}. [${h.role}] ${h.parts[0].text.substring(0, 50)}... (${h.parts[0].text.length} chars)`);
+    });
     
     // Get model and create chat with history
     const model = geminiClient.getGenerativeModel({ model: GEMINI_MODEL });
