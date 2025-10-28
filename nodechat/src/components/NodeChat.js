@@ -273,6 +273,27 @@ function NodeChat() {
     e.target.value = '';
   }, [nodes.length, setNodes, setEdges, showNotification]);
 
+  // Global keyboard event listener
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Tab key: Create child user node when LLM node is selected
+      if (e.key === 'Tab') {
+        const selectedNode = getSelectedNode();
+        if (selectedNode && selectedNode.type === 'llmResponse') {
+          e.preventDefault();
+          const nodeElement = document.querySelector(`[data-id="${selectedNode.id}"]`);
+          const nodeHeight = nodeElement ? nodeElement.offsetHeight : 0;
+          addNode('userInput', selectedNode, { x: (Math.random()-0.5) * 100, y: 30 + nodeHeight }, null, true);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [getSelectedNode, addNode]);
+
   return (
     <div className="h-full relative" ref={reactFlowWrapper}>
       <ReactFlow
@@ -352,8 +373,16 @@ function NodeChat() {
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={(e) => {
+              // Shift+Enter: 发送消息
+              if (e.key === 'Enter' && e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+              }
+              // Enter alone: 换行（默认行为，不需要处理）
+            }}
             className="flex-grow mr-2 p-2 border border-gray-300 rounded"
-            placeholder="Type your message here..."
+            placeholder="Type your message here... (Shift+Enter to send)"
             style={{ maxHeight: '5em', resize: 'none' }}
           />
           <button

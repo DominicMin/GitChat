@@ -96,6 +96,9 @@ const UserInputNode = (props) => {
     setText(evt.target.value);
   }, []);
 
+  // Use a ref to store updateSize so it can be called in onTextBlur
+  const updateSizeRef = useRef(null);
+
   const onTextBlur = useCallback(() => {
     setIsEditing(false);
     reactFlow.setNodes((nodes) =>
@@ -106,7 +109,9 @@ const UserInputNode = (props) => {
         return node;
       })
     );
-    updateSize();
+    if (updateSizeRef.current) {
+      updateSizeRef.current();
+    }
   }, [props.id, reactFlow, text]);
 
   const handleDoubleClick = useCallback(() => {
@@ -155,6 +160,34 @@ const UserInputNode = (props) => {
       wrapperRef.current.style.height = `${wrapperHeightEm}em`;
     }
   }, [isFolded]);
+
+  // Store updateSize in ref so it can be called in onTextBlur
+  updateSizeRef.current = updateSize;
+
+  const handleKeyDown = useCallback((e) => {
+    // Shift+Enter: 结束编辑并发送（触发 regenerate）
+    if (e.key === 'Enter' && e.shiftKey) {
+      e.preventDefault();
+      if (isEditing) {
+        // 保存文本并结束编辑
+        reactFlow.setNodes((nodes) =>
+          nodes.map((node) => {
+            if (node.id === props.id) {
+              node.data = { ...node.data, text: text };
+            }
+            return node;
+          })
+        );
+        setIsEditing(false);
+        // 触发 regenerate
+        setTimeout(() => {
+          updateSize();
+          onRegenerate();
+        }, 100);
+      }
+    }
+    // Enter alone: 换行（默认行为）
+  }, [isEditing, reactFlow, props.id, text, updateSize, onRegenerate]);
   
   useEffect(() => {
     if (textareaRef.current) {
@@ -217,6 +250,7 @@ const UserInputNode = (props) => {
           value={text}
           onChange={onTextChange}
           onBlur={onTextBlur}
+          onKeyDown={handleKeyDown}
           readOnly={!isEditing}
           onDoubleClick={handleDoubleClick}
           style={{ 
