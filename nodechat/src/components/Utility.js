@@ -1,6 +1,6 @@
 import { getOutgoers, getIncomers } from '@xyflow/react';
 
-export async function sendConversationRequest(endpoint, conversation, onChunkReceived) {
+export async function sendConversationRequest(endpoint, conversation, onChunkReceived, additionalData = {}) {
   try {
     // Make the POST request and handle streaming response
     const response = await fetch(`http://localhost:8000/${endpoint}`, {
@@ -8,7 +8,7 @@ export async function sendConversationRequest(endpoint, conversation, onChunkRec
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ conversation }),
+      body: JSON.stringify({ conversation, ...additionalData }),
     });
 
     if (!response.ok) {
@@ -47,6 +47,11 @@ export async function sendConversationRequest(endpoint, conversation, onChunkRec
     console.error('Failed to send conversation request:', error);
     throw error;
   }
+}
+
+// Convenience function for calling Gemini API
+export async function callGeminiAPI(conversation, newMessage, onChunkReceived) {
+  return sendConversationRequest('generate/gemini', conversation, onChunkReceived, { newMessage });
 }
 
 export function findAllDescendants(nodeId, nodes, edges) {

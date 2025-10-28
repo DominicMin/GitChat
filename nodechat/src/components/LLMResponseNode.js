@@ -60,20 +60,37 @@ const LLMResponseNode = (props) => {
     setIsFolded(!isFolded);
   };
 
+  // Get model info from node data
+  const modelLabel = props.data.modelLabel || 'Unknown';
+  const modelType = props.data.model || 'unknown';
+  
+  // Determine color based on model
+  const isGemini = modelType === 'gemini';
+  const bgColor = isGemini ? 'bg-purple-100' : 'bg-blue-100';
+  const borderColor = props.selected 
+    ? (isGemini ? 'border-purple-500' : 'border-blue-500')
+    : (isGemini ? 'border-purple-200' : 'border-blue-200');
+  const handleColor = isGemini ? '!bg-purple-500' : '!bg-blue-500';
+  const textColor = isGemini ? 'text-purple-700' : 'text-blue-700';
+  const badgeColor = isGemini ? 'bg-purple-500' : 'bg-blue-500';
+
   return (
     <div
-      className={`px-4 py-2 shadow-md rounded-md bg-blue-100 border-2 ${
-        props.selected ? 'border-blue-500' : 'border-blue-200'
-      } relative`}
+      className={`px-4 py-2 shadow-md rounded-md ${bgColor} border-2 ${borderColor} relative`}
       style={{ 
         maxWidth: isFolded ? '25em' : '35em',
      }}
     >
-      <Handle type="target" position={Position.Top} className="!w-3 !h-3 !bg-blue-500" />
-      <div className="font-bold text-sm text-blue-700 flex justify-between">
-        LLM Response
+      <Handle type="target" position={Position.Top} className={`!w-3 !h-3 ${handleColor}`} />
+      <div className={`font-bold text-sm ${textColor} flex justify-between items-center`}>
+        <div className="flex items-center gap-2">
+          <span>LLM Response</span>
+          <span className={`text-xs ${badgeColor} text-white px-2 py-0.5 rounded-full`}>
+            {isGemini ? '🔮' : '🤖'} {modelLabel}
+          </span>
+        </div>
         {isFoldable && (
-          <button onClick={toggleFold} className="text-xs text-blue-500">
+          <button onClick={toggleFold} className={`text-xs ${isGemini ? 'text-purple-500' : 'text-blue-500'}`}>
             {isFolded ? 'Expand' : 'Fold'}
           </button>
         )}
@@ -130,7 +147,7 @@ const LLMResponseNode = (props) => {
           </ReactMarkdown>
         </div>
       )}
-      <Handle type="source" position={Position.Bottom} className="!w-3 !h-3 !bg-blue-500" />
+      <Handle type="source" position={Position.Bottom} className={`!w-3 !h-3 ${handleColor}`} />
     </div>
   );
 };

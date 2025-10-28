@@ -1,6 +1,6 @@
 import React, { memo, useState, useCallback, useRef, useEffect } from 'react';
-import { Handle, Position, useReactFlow, getOutgoers } from '@xyflow/react';
-import { getConversationHistory, sendConversationRequest, findAllDescendants } from './Utility';
+import { Handle, Position, useReactFlow, getOutgoers, getIncomers } from '@xyflow/react';
+import { getConversationHistory, sendConversationRequest, callGeminiAPI, findAllDescendants } from './Utility';
 
 const UserInputNode = (props) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -42,9 +42,22 @@ const UserInputNode = (props) => {
     const nodes = reactFlow.getNodes();
     const edges = reactFlow.getEdges();
     const history = getConversationHistory(node, nodes, edges);
+    
+    // Get the parent user node to find the original message
+    const incomers = getIncomers(node, nodes, edges);
+    const parentUserNode = incomers.find(n => n.type === 'userInput');
+    const userMessage = parentUserNode ? parentUserNode.data.text : 'Continue the conversation.';
 
     try {
-      await sendConversationRequest('generate', history, (content) => onChunkReceived(content, node.id));
+      // Use the model stored in the node data
+      const nodeModel = node.data?.model || 'openai';
+      if (nodeModel === 'gemini') {
+        console.log('🎯 Regenerating with Gemini API');
+        await callGeminiAPI(history, userMessage, (content) => onChunkReceived(content, node.id));
+      } else {
+        console.log('🎯 Regenerating with OpenAI API');
+        await sendConversationRequest('generate', history, (content) => onChunkReceived(content, node.id));
+      }
     } catch (error) {
       console.error('Failed to generate response:', error);
     }
@@ -58,10 +71,18 @@ const UserInputNode = (props) => {
 
     // If no LLM response node, create one
     if (outgoers.length === 0) {
+      // Get current model from props
+      const currentModel = props.selectedModel || 'openai';
+      const modelLabel = currentModel === 'gemini' ? 'Gemini' : 'OpenAI';
+      
       const llmNode = {
         id: `llmResponse-${Date.now()}`,
         type: 'llmResponse',
-        data: { text: '' },
+        data: { 
+          text: '',
+          model: currentModel,
+          modelLabel: modelLabel
+        },
         position: { x: userNode.position.x, y: userNode.position.y + 150 },
       };
 
@@ -90,7 +111,7 @@ const UserInputNode = (props) => {
         await regenerateNode(descendantNode);
       }
     }
-  }, [props.id, reactFlow, regenerateNode]);
+  }, [props.id, props.selectedModel, reactFlow, regenerateNode]);
 
   const onTextChange = useCallback((evt) => {
     setText(evt.target.value);

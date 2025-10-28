@@ -17,16 +17,12 @@ import UserInputNode from './UserInputNode';
 import LLMResponseNode from './LLMResponseNode';
 import CustomEdge from './CustomEdge';
 import { 
-  sendConversationRequest, 
+  sendConversationRequest,
+  callGeminiAPI,
   getConversationHistory,
   exportConversationToFile,
   importConversationFromFile
 } from './Utility';
-
-const nodeTypes = {
-  userInput: UserInputNode,
-  llmResponse: LLMResponseNode,
-};
 
 const edgeTypes = {
   custom: CustomEdge,
@@ -49,6 +45,13 @@ function NodeChat() {
   const currentLlmNodeId = useRef(null);
   const fileInputRef = useRef(null);
   const [notification, setNotification] = useState('');
+  const [selectedModel, setSelectedModel] = useState('openai'); // 'openai' | 'gemini'
+  
+  // Create nodeTypes with injected selectedModel
+  const nodeTypes = React.useMemo(() => ({
+    userInput: (props) => <UserInputNode {...props} selectedModel={selectedModel} />,
+    llmResponse: LLMResponseNode,
+  }), [selectedModel]);
 
   const onEdgeClick = useCallback((edgeId) => {
     setEdges((eds) => eds.filter((e) => e.id !== edgeId));
@@ -64,7 +67,7 @@ function NodeChat() {
     [onEdgeClick, setEdges]
   );
 
-  const addNode = useCallback((type, sourceNode = null, offset = { x: 0, y: 0 }, text = null, connectToSource = false) => {
+  const addNode = useCallback((type, sourceNode = null, offset = { x: 0, y: 0 }, text = null, connectToSource = false, additionalData = {}) => {
     return new Promise((resolve) => {
       const {
         height,
@@ -96,7 +99,10 @@ function NodeChat() {
       const newNode = {
         id: `${type}-${Date.now()}`,
         type,
-        data: { text: text || (type === 'userInput' ? 'New user input' : 'New LLM response') },
+        data: { 
+          text: text || (type === 'userInput' ? 'New user input' : 'New LLM response'),
+          ...additionalData
+        },
         position: position,
       };
 
@@ -217,7 +223,9 @@ function NodeChat() {
     const userNodeElement = document.querySelector(`[data-id="${userNode.id}"]`);
     const userNodeHeight = userNodeElement ? userNodeElement.offsetHeight : 0;
 
-    const llmNode = await addNode('llmResponse', userNode, { x: 0, y: userNodeHeight + 20 }, '', true);
+    // 创建 LLM 节点时添加模型信息
+    const modelLabel = selectedModel === 'gemini' ? 'Gemini' : 'OpenAI';
+    const llmNode = await addNode('llmResponse', userNode, { x: 0, y: userNodeHeight + 20 }, '', true, { model: selectedModel, modelLabel });
     currentLlmNodeId.current = llmNode.id;
     llmNode.data.text = '';
     setMessage('');
@@ -230,12 +238,19 @@ function NodeChat() {
     let history = getConversationHistory(userNode, updatedNodes, updatedEdges);
     
     try {
-      await sendConversationRequest('generate', history, onChunkReceived);
+      // 根据选择的模型调用对应 API
+      if (selectedModel === 'gemini') {
+        console.log('🎯 使用 Gemini API');
+        await callGeminiAPI(history, message, onChunkReceived);
+      } else {
+        console.log('🎯 使用 OpenAI API');
+        await sendConversationRequest('generate', history, onChunkReceived);
+      }
     } catch (error) {
       console.error('Failed to generate response:', error);
       // Handle error (e.g., show error message to user)
     }
-  }, [message, getSelectedNode, addNode, setSelectNode, reactFlow, nodes, onChunkReceived]);
+  }, [message, getSelectedNode, addNode, setSelectNode, reactFlow, nodes, onChunkReceived, selectedModel]);
 
   // Show notification message
   const showNotification = useCallback((msg) => {
@@ -351,6 +366,31 @@ function NodeChat() {
         >
           📤 导入
         </button>
+        <div className="border-l border-gray-300 mx-2"></div>
+        {/* 模型选择器 */}
+        <div className="flex items-center bg-white rounded shadow-md px-3 py-1 border border-gray-300">
+          <span className="text-sm text-gray-600 mr-2">模型:</span>
+          <button
+            className={`px-3 py-1 rounded-l text-sm font-medium transition-colors ${
+              selectedModel === 'openai' 
+                ? 'bg-blue-500 text-white' 
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+            onClick={() => setSelectedModel('openai')}
+          >
+            OpenAI
+          </button>
+          <button
+            className={`px-3 py-1 rounded-r text-sm font-medium transition-colors ${
+              selectedModel === 'gemini' 
+                ? 'bg-purple-500 text-white' 
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+            onClick={() => setSelectedModel('gemini')}
+          >
+            🔮 Gemini
+          </button>
+        </div>
         <input
           ref={fileInputRef}
           type="file"
@@ -382,14 +422,16 @@ function NodeChat() {
               // Enter alone: 换行（默认行为，不需要处理）
             }}
             className="flex-grow mr-2 p-2 border border-gray-300 rounded"
-            placeholder="Type your message here... (Shift+Enter to send)"
+            placeholder="Type your message... (Shift+Enter 发送)"
             style={{ maxHeight: '5em', resize: 'none' }}
           />
           <button
             onClick={handleSendMessage}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            className={`px-4 py-2 text-white rounded hover:opacity-90 transition-opacity ${
+              selectedModel === 'gemini' ? 'bg-purple-500' : 'bg-blue-500'
+            }`}
           >
-            Send
+            {selectedModel === 'gemini' ? '🔮 Send' : 'Send'}
           </button>
         </div>
       </div>

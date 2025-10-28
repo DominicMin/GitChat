@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const OpenAI = require('openai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const fs = require('fs').promises;
 const { encoding_for_model } = require('tiktoken');
 require('dotenv').config();
@@ -27,6 +28,18 @@ if (process.env.OPENAI_BASE_URL) {
 
 const openai = new OpenAI(openaiConfig);
 
+// Configure Google Gemini API
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+let geminiClient = null;
+
+if (GEMINI_API_KEY) {
+  geminiClient = new GoogleGenerativeAI(GEMINI_API_KEY);
+  console.log('✅ Gemini API initialized');
+} else {
+  console.log('⚠️  Gemini API key not found (set GEMINI_API_KEY to enable)');
+}
+
 // Use custom model name from environment variable, default to gpt-4o
 const MODEL_NAME = process.env.OPENAI_MODEL || 'gpt-4o';
 
@@ -42,6 +55,16 @@ async function loadSystemPrompt() {
 }
 
 // ===== Utility Functions =====
+
+// Convert GitChat conversation to Gemini history format
+function buildGeminiHistory(conversation) {
+  return conversation
+    .filter(node => node.content && node.content.trim().length > 0)
+    .map(node => ({
+      role: node.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: node.content }]
+    }));
+}
 
 // Generate request ID
 function generateRequestId() {
@@ -219,6 +242,116 @@ app.post("/generate", async (req, res) => {
     printRequestStats({
       requestId,
       model: MODEL_NAME,
+      userNodes: 0,
+      llmNodes: 0,
+      totalNodes: 0,
+      inputTokens: 0,
+      duration: formatDuration(duration),
+      error: error.message
+    });
+    
+    // Only send JSON error if stream hasn't started
+    if (!streamStarted) {
+      res.status(500).json({ error: error.message });
+    } else {
+      // If stream already started, send error through SSE
+      res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+      res.end();
+    }
+  }
+});
+
+// ===== Gemini Endpoint =====
+app.post("/generate/gemini", async (req, res) => {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
+  let streamStarted = false;
+  let outputText = '';
+  
+  try {
+    // Check if Gemini is enabled
+    if (!geminiClient) {
+      throw new Error('Gemini API not configured. Please set GEMINI_API_KEY in .env');
+    }
+    
+    const data = req.body;
+    const conversation = data.conversation || [];
+    
+    // Analyze conversation
+    const analysis = analyzeConversation(conversation);
+    
+    // Print request info
+    console.log('\n' + '='.repeat(60));
+    console.log(`📨 SENDING GEMINI REQUEST: ${requestId}`);
+    console.log('='.repeat(60));
+    console.log(`🎯 Model: ${GEMINI_MODEL}`);
+    console.log(`📊 Nodes: ${analysis.userNodes} user + ${analysis.llmNodes} LLM = ${analysis.totalNodes} total`);
+    console.log(`⏳ Waiting for response...`);
+    console.log('='.repeat(60));
+
+    // Build Gemini history from conversation
+    const history = buildGeminiHistory(conversation);
+    
+    // Get model and create chat with history
+    const model = geminiClient.getGenerativeModel({ model: GEMINI_MODEL });
+    const chat = model.startChat({ history: history });
+    
+    // Get the last user message (the new message to send)
+    const lastUserMessage = data.newMessage || 'Continue the conversation.';
+    
+    // Send message and get streaming response
+    const result = await chat.sendMessageStream(lastUserMessage);
+    
+    // Set up streaming response
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive'
+    });
+    streamStarted = true;
+
+    // Stream the response
+    for await (const chunk of result.stream) {
+      const text = chunk.text();
+      if (text) {
+        outputText += text;
+        res.write(`data: ${JSON.stringify({ content: text })}\n\n`);
+      }
+    }
+
+    res.write(`data: ${JSON.stringify({ content: "[DONE]" })}\n\n`);
+    res.end();
+    
+    // Calculate response time
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+    const outputTokens = countTokens(outputText, 'gpt-4'); // Approximate
+    const speed = duration > 0 ? (outputTokens / (duration / 1000)).toFixed(2) : 0;
+    
+    // Print completion statistics
+    printRequestStats({
+      requestId,
+      model: GEMINI_MODEL,
+      userNodes: analysis.userNodes,
+      llmNodes: analysis.llmNodes,
+      totalNodes: analysis.totalNodes,
+      inputTokens: countTokens(JSON.stringify(conversation), 'gpt-4'),
+      outputTokens: outputTokens,
+      duration: formatDuration(duration),
+      speed: speed,
+      error: null
+    });
+    
+  } catch (error) {
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+    
+    console.error("Error in Gemini generate endpoint:", error);
+    
+    // Print error statistics
+    printRequestStats({
+      requestId,
+      model: GEMINI_MODEL,
       userNodes: 0,
       llmNodes: 0,
       totalNodes: 0,

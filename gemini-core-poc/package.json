@@ -1,0 +1,25 @@
+{
+  "name": "gemini-core-poc",
+  "version": "1.0.0",
+  "description": "POC to test @google/gemini-cli-core for GitChat integration",
+  "main": "index.js",
+  "scripts": {
+    "test:basic": "node test-1-basic.js",
+    "test:context": "node test-2-context-injection.js",
+    "test:checkpoint": "node test-3-checkpoint.js",
+    "test:streaming": "node test-4-streaming.js",
+    "test:all": "npm run test:basic && npm run test:context && npm run test:checkpoint && npm run test:streaming"
+  },
+  "keywords": [
+    "gemini",
+    "ai",
+    "poc",
+    "gitchat"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@google/gemini-cli-core": "^0.10.0",
+    "@google/generative-ai": "^0.21.0"
+  }
+}
