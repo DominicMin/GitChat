@@ -200,6 +200,13 @@ app.post("/generate", async (req, res) => {
     });
     streamStarted = true;
 
+    // Send token info first
+    res.write(`data: ${JSON.stringify({ 
+      type: 'token_info',
+      inputTokens: totalInputTokens,
+      model: MODEL_NAME
+    })}\n\n`);
+
     // Stream processing and accumulate output
     for await (const chunk of stream) {
       if (chunk.choices[0]?.delta?.content) {
@@ -280,12 +287,19 @@ app.post("/generate/gemini", async (req, res) => {
     // Analyze conversation
     const analysis = analyzeConversation(conversation);
     
+    // Calculate input tokens (approximate)
+    const conversationText = JSON.stringify(conversation);
+    const systemPromptTokens = countTokens(systemPrompt, 'gpt-4'); // Use same system prompt
+    const conversationTokens = countTokens(conversationText, 'gpt-4'); // Approximate
+    const totalInputTokens = systemPromptTokens + conversationTokens;
+    
     // Print request info
     console.log('\n' + '='.repeat(60));
     console.log(`📨 SENDING GEMINI REQUEST: ${requestId}`);
     console.log('='.repeat(60));
     console.log(`🎯 Model: ${GEMINI_MODEL}`);
     console.log(`📊 Nodes: ${analysis.userNodes} user + ${analysis.llmNodes} LLM = ${analysis.totalNodes} total`);
+    console.log(`📝 Input Tokens: ~${totalInputTokens} (system: ${systemPromptTokens}, conversation: ${conversationTokens})`);
     console.log(`⏳ Waiting for response...`);
     console.log('='.repeat(60));
 
@@ -309,6 +323,13 @@ app.post("/generate/gemini", async (req, res) => {
       'Connection': 'keep-alive'
     });
     streamStarted = true;
+
+    // Send token info first
+    res.write(`data: ${JSON.stringify({ 
+      type: 'token_info',
+      inputTokens: totalInputTokens,
+      model: GEMINI_MODEL
+    })}\n\n`);
 
     // Stream the response
     for await (const chunk of result.stream) {
@@ -335,7 +356,7 @@ app.post("/generate/gemini", async (req, res) => {
       userNodes: analysis.userNodes,
       llmNodes: analysis.llmNodes,
       totalNodes: analysis.totalNodes,
-      inputTokens: countTokens(JSON.stringify(conversation), 'gpt-4'),
+      inputTokens: totalInputTokens,
       outputTokens: outputTokens,
       duration: formatDuration(duration),
       speed: speed,

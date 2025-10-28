@@ -15,6 +15,7 @@ const UserInputNode = (props) => {
     if (props.data.text !== text) {
       setText(props.data.text);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.data.text]);
 
   useEffect(() => {
@@ -43,20 +44,49 @@ const UserInputNode = (props) => {
     const edges = reactFlow.getEdges();
     const history = getConversationHistory(node, nodes, edges);
     
+    // Debug: 打印对话树结构
+    console.log('📊 [Regenerate] 对话树统计:');
+    console.log(`  节点数量: ${history.length}`);
+    console.log(`  总字符数: ${JSON.stringify(history).length}`);
+    history.forEach((h, i) => {
+      console.log(`  ${i + 1}. [${h.role}] ${h.content ? h.content.substring(0, 50) : '(空)'}... (${h.content?.length || 0} 字符)`);
+    });
+    
     // Get the parent user node to find the original message
     const incomers = getIncomers(node, nodes, edges);
     const parentUserNode = incomers.find(n => n.type === 'userInput');
     const userMessage = parentUserNode ? parentUserNode.data.text : 'Continue the conversation.';
+
+    // Callback to save token info to parentUserNode
+    const onTokenInfo = (tokenData) => {
+      if (parentUserNode) {
+        reactFlow.setNodes((nds) =>
+          nds.map((n) => {
+            if (n.id === parentUserNode.id) {
+              return { 
+                ...n,
+                data: { 
+                  ...n.data, 
+                  contextTokens: tokenData.inputTokens,
+                  modelUsed: tokenData.model
+                }
+              };
+            }
+            return n;
+          })
+        );
+      }
+    };
 
     try {
       // Use the model stored in the node data
       const nodeModel = node.data?.model || 'openai';
       if (nodeModel === 'gemini') {
         console.log('🎯 Regenerating with Gemini API');
-        await callGeminiAPI(history, userMessage, (content) => onChunkReceived(content, node.id));
+        await callGeminiAPI(history, userMessage, (content) => onChunkReceived(content, node.id), onTokenInfo);
       } else {
         console.log('🎯 Regenerating with OpenAI API');
-        await sendConversationRequest('generate', history, (content) => onChunkReceived(content, node.id));
+        await sendConversationRequest('generate', history, (content) => onChunkReceived(content, node.id), {}, onTokenInfo);
       }
     } catch (error) {
       console.error('Failed to generate response:', error);
@@ -257,13 +287,20 @@ const UserInputNode = (props) => {
           className="!w-3 !h-3 !bg-teal-500" 
           style={{ top: -10 }}
         />
-        <div className="font-bold text-sm text-green-700 mb-2 flex justify-between">
-          User Input
-          {isFoldable && (
-            <button onClick={toggleFold} className="text-xs text-green-500">
-              {isFolded ? 'Expand' : 'Fold'}
-            </button>
-          )}
+        <div className="font-bold text-sm text-green-700 mb-2 flex justify-between items-center">
+          <span>User Input</span>
+          <div className="flex items-center gap-2">
+            {props.data.contextTokens && (
+              <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full">
+                📊 {props.data.contextTokens.toLocaleString()} tokens
+              </span>
+            )}
+            {isFoldable && (
+              <button onClick={toggleFold} className="text-xs text-green-500">
+                {isFolded ? 'Expand' : 'Fold'}
+              </button>
+            )}
+          </div>
         </div>
         <textarea
           ref={textareaRef}

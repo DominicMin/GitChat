@@ -1,6 +1,6 @@
 import { getOutgoers, getIncomers } from '@xyflow/react';
 
-export async function sendConversationRequest(endpoint, conversation, onChunkReceived, additionalData = {}) {
+export async function sendConversationRequest(endpoint, conversation, onChunkReceived, additionalData = {}, onTokenInfo = null) {
   try {
     // Make the POST request and handle streaming response
     const response = await fetch(`http://localhost:8000/${endpoint}`, {
@@ -33,7 +33,12 @@ export async function sendConversationRequest(endpoint, conversation, onChunkRec
 
         if (chunk.startsWith('data: ')) {
           const data = JSON.parse(chunk.slice(6));
-          if (data.content === '[DONE]') {
+          if (data.type === 'token_info') {
+            // Handle token info
+            if (onTokenInfo) {
+              onTokenInfo(data);
+            }
+          } else if (data.content === '[DONE]') {
             return;
           } else {
             onChunkReceived(data.content);
@@ -50,8 +55,8 @@ export async function sendConversationRequest(endpoint, conversation, onChunkRec
 }
 
 // Convenience function for calling Gemini API
-export async function callGeminiAPI(conversation, newMessage, onChunkReceived) {
-  return sendConversationRequest('generate/gemini', conversation, onChunkReceived, { newMessage });
+export async function callGeminiAPI(conversation, newMessage, onChunkReceived, onTokenInfo = null) {
+  return sendConversationRequest('generate/gemini', conversation, onChunkReceived, { newMessage }, onTokenInfo);
 }
 
 export function findAllDescendants(nodeId, nodes, edges) {
